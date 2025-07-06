@@ -1,0 +1,136 @@
+plugins {
+	id 'java'
+	id 'org.springframework.boot' version '3.5.3'
+	id 'io.spring.dependency-management' version '1.1.7'
+	id "org.openapi.generator" version "7.1.0"
+}
+
+group = 'com.amazon.ads'
+version = '0.0.1-SNAPSHOT'
+
+java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(17)
+	}
+}
+
+repositories {
+	mavenCentral()
+	// Add Spring Milestone and Snapshot repositories
+	maven { url 'https://repo.spring.io/milestone' }
+	maven { url 'https://repo.spring.io/snapshot' }
+	maven { url 'https://packages.confluent.io/maven/' }
+}
+
+dependencies {
+	implementation 'org.springframework.boot:spring-boot-starter'
+	implementation 'org.springframework.boot:spring-boot-starter-web'
+	implementation 'io.swagger.core.v3:swagger-annotations:2.2.20'
+	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.3.0'
+	implementation 'javax.validation:validation-api:2.0.1.Final'
+	implementation 'javax.annotation:javax.annotation-api:1.3.2'
+	implementation 'org.json:json:20231013'
+
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+	implementation 'org.springframework.boot:spring-boot-starter-web'
+	implementation 'org.springframework:spring-web'
+	implementation 'org.springframework.ai:spring-ai-starter-mcp-server:1.0.0'
+	implementation 'org.springframework.ai:spring-ai-starter-mcp-server-webmvc:1.0.0'
+	implementation 'org.springframework.ai:spring-ai-starter-mcp-server-webflux:1.0.0'
+	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.1.0'
+
+	implementation 'io.swagger:swagger-annotations:1.6.11'
+	implementation 'com.google.code.findbugs:jsr305:3.0.2'
+	implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+	implementation 'com.squareup.okhttp3:logging-interceptor:4.12.0'
+	implementation 'com.google.code.gson:gson:2.10.1'
+	implementation 'io.gsonfire:gson-fire:1.9.0'
+	implementation 'javax.annotation:javax.annotation-api:1.3.2'
+
+	implementation 'org.openapitools:jackson-databind-nullable:0.2.6'
+	implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.2'
+	implementation 'com.fasterxml.jackson.core:jackson-annotations:2.15.2'
+	implementation 'com.fasterxml.jackson.core:jackson-core:2.15.2'
+	implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.15.2'
+
+    implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+
+}
+
+tasks.named('test') {
+	useJUnitPlatform()
+}
+
+tasks.register('generateSdk', org.openapitools.generator.gradle.plugin.tasks.GenerateTask) {
+	generatorName = "java"
+	inputSpec = "$rootDir/src/main/resources/adsApiv1.yaml"  // Your OAS file path
+	outputDir = "$buildDir/generated-sdk"
+	apiPackage = "com.amazon.ads.adsApi.client"
+	modelPackage = "com.amazon.ads.adsApi.model"
+	// Use proper task configuration
+	doFirst {
+		mkdir outputDir
+	}
+
+	configOptions = [
+			dateLibrary: "java8",
+			library: "okhttp-gson",
+			hideGenerationTimestamp: "true",
+			serializationLibrary: "gson",
+			sourceFolder: "src/main/java",
+			artifactId: "api-client-sdk",
+			groupId: "com.amazon.ads.mcp",
+			artifactVersion: "1.0.0",
+			developerName: "Gaurav Bansal",
+			developerEmail: "bansag@amazon.com",
+			java8: "true"
+	]
+}
+
+sourceSets {
+	main {
+		java {
+			srcDirs += ["${buildDir}/generated-sdk/src/main/java"]
+		}
+	}
+}
+
+// Proper task dependencies
+tasks.named('compileJava') {
+	dependsOn tasks.named('generateSdk')
+}
+
+// Proper clean task configuration
+tasks.named('clean') {
+	delete "${buildDir}/generated-sdk"
+}
+
+// Optional: Add validation task
+tasks.register('validateOpenApi') {
+	group = 'verification'
+	description = 'Validates the OpenAPI specification'
+
+	doLast {
+		if (!file("$rootDir/src/main/resources/adsApiv1.yaml").exists()) {
+			throw new GradleException("OpenAPI specification file not found")
+		}
+	}
+}
+
+// Make generateSdk depend on validation
+tasks.named('generateSdk') {
+	dependsOn tasks.named('validateOpenApi')
+}
+
+// Add this to handle Java 8 date/time types properly
+tasks.withType(JavaCompile) {
+	options.compilerArgs += ['-parameters']
+}
+
+// Configure the JAR
+bootJar {
+	archiveBaseName = 'ai-mcp-campaign'
+	archiveVersion = '1.0.0'
+}
